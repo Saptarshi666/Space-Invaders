@@ -6,8 +6,12 @@
 #include <stdint.h>
 #include "Sound.h"
 #include "DAC.h"
+#include "Timer0.h"
+#include "../inc/tm4c123gh6pm.h"
 // these are sampled at 8 bits 11kHz
 // If your DAC is less than 8 bits you will need to scale the data
+void shootsound(void);
+
 const uint8_t shoot[4080] = {
   129, 99, 103, 164, 214, 129, 31, 105, 204, 118, 55, 92, 140, 225, 152, 61, 84, 154, 184, 101, 
   75, 129, 209, 135, 47, 94, 125, 207, 166, 72, 79, 135, 195, 118, 68, 122, 205, 136, 64, 106, 
@@ -1139,9 +1143,26 @@ const uint8_t highpitch[1802] = {
 
 // define a background task to run at 11 kHz, which outputs one value to DAC each interrupt
   
+	uint32_t length;
+const uint8_t *soundptr;
+	
+void Soundtask(void){
+	if(length){
+		DAC_Out(*soundptr/16);
+		soundptr++;
+		length--;
+	}
+	else{
+		NVIC_DIS0_R = 1<<21;
+	}	
+}
+	
 void Sound_Init(void){
 // write this
-  // initialize a 11kHz timer, and the DAC
+	length = 0;
+  Timer0_Init(&Soundtask,7256);
+	DAC_Init();
+
 };
 
 //******* Sound_Start ************
@@ -1155,5 +1176,27 @@ void Sound_Init(void){
 // special cases: as you wish to implement
 void Sound_Start(const uint8_t *pt, uint32_t count){
 // write this
+	length = count;
+	soundptr = pt;
+	NVIC_EN0_R = 1 <<21; // enable irq 19 in nvic
 };
 
+
+	
+void shootsound(void){
+	//DAC_Out(shoot[soundct]);
+	//soundct++;
+	Sound_Start(shoot, 4080);
+}
+
+	uint16_t soundct = 0;
+void PlayShootSound (void){
+	soundct = 0;
+	TIMER0_CTL_R = 0x00000001;
+	while(soundct < 4081){
+	}
+	if(soundct==4081){
+		TIMER0_CTL_R = 0x00000000;
+		soundct=0;
+	}
+}
